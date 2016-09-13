@@ -1388,24 +1388,25 @@ s.touches = {
 
 // Touch handlers
 var isTouchEvent, startMoving;
+var touchDebug = false;
 var logTouch = function (e, touchType) {
     var touches = e[touchType];
     if (!touches) return null;
     var sb = '';
     var len = touches.length;
-    sb = sb + len + ",["
+    sb = sb + len + ',[';
     for (var i = 0; i < len; ++i) {
-        sb = sb + touches[i].identifier + ",";
+        sb = sb + touches[i].identifier + ',';
     }
-    sb = sb + "]";
-    console.log(touchType + ":" + sb);
+    sb = sb + ']';
+    console.log(touchType + ':' + sb);
 };
 var logTouchEvent = function (e) {
-    return;
+    if(!touchDebug) return;
     console.log(e.type);
-    logTouch(e, "touches");
-    logTouch(e, "targetTouches");
-    logTouch(e, "changedTouches");
+    logTouch(e, 'touches');
+    logTouch(e, 'targetTouches');
+    logTouch(e, 'changedTouches');
 };
 s.onTouchStart = function (e) {
     if (e.originalEvent) e = e.originalEvent;
@@ -1427,7 +1428,6 @@ s.onTouchStart = function (e) {
         //if (isTouched && e.touches && e.touches.length > 1) return;//ignore the latter
         var targetTouch;
         //Or latter first?
-        var j = 0;
         for (var j = e.changedTouches.length - 1; j >= 0; --j) {
             for (var i = e.targetTouches.length - 1; i >= 0; --i) {
                 if (e.changedTouches[j].identifier === e.targetTouches[i].identifier) {
@@ -1494,7 +1494,7 @@ s.onTouchMove = function (e) {
     var curTarget;
     if (curIsTouchEvent) {
         for (var i = 0, len = e.targetTouches.length; i < len; ++i) {
-            if (s.touches.id == undefined ||
+            if (s.touches.id === undefined ||
                 e.targetTouches[i].identifier === s.touches.id) {
 
                 curTarget = e.targetTouches[i];
@@ -1664,11 +1664,11 @@ s.onTouchEnd = function (e) {
     if (e.originalEvent) e = e.originalEvent;
     logTouchEvent(e);
     if (e.type === 'touchend' || e.type === 'touchcancel') {
-        if (s.touches.id != undefined) {
+        if (s.touches.id !== undefined) {
             var targetTouch;
-            for (var i = 0, len = e.changedTouches.length; i < len; ++i) {
-                if (e.changedTouches[i].identifier === s.touches.id) {
-                    targetTouch = e.changedTouches[i];
+            for (var k = 0, len = e.changedTouches.length; k < len; ++k) {
+                if (e.changedTouches[k].identifier === s.touches.id) {
+                    targetTouch = e.changedTouches[k];
                     break;
                 }
             }
