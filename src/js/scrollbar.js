@@ -28,6 +28,7 @@ s.scrollbar = {
         sb.isTouched = true;
         e.preventDefault();
         e.stopPropagation();
+        if (e.touches && e.touches.length > 1) return;
 
         sb.setDragPosition(e);
         clearTimeout(sb.dragTimeout);
@@ -45,6 +46,7 @@ s.scrollbar = {
         if (!sb.isTouched) return;
         if (e.preventDefault) e.preventDefault();
         else e.returnValue = false;
+        if (e.touches && e.touches.length > 1) return;
         sb.setDragPosition(e);
         s.wrapper.transition(0);
         sb.track.transition(0);
@@ -52,6 +54,7 @@ s.scrollbar = {
         s.emit('onScrollbarDragMove', s);
     },
     dragEnd: function (e) {
+        if (e.touches && e.touches.length > 0) return;
         var sb = s.scrollbar;
         if (!sb.isTouched) return;
         sb.isTouched = false;

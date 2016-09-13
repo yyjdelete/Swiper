@@ -1398,6 +1398,7 @@ s.onTouchStart = function (e) {
     if (s.params.swipeHandler) {
         if (!findElementInEvent(e, s.params.swipeHandler)) return;
     }
+    if (e.touches && e.touches.length > 1) return;
 
     var startX = s.touches.currentX = e.type === 'touchstart' ? e.targetTouches[0].pageX : e.pageX;
     var startY = s.touches.currentY = e.type === 'touchstart' ? e.targetTouches[0].pageY : e.pageY;
@@ -1435,6 +1436,7 @@ s.onTouchStart = function (e) {
 s.onTouchMove = function (e) {
     if (e.originalEvent) e = e.originalEvent;
     if (isTouchEvent && e.type === 'mousemove') return;
+    if (e.touches && e.touches.length > 1) return;
     if (e.preventedByNestedSwiper) {
         s.touches.startX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
         s.touches.startY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
