@@ -78,6 +78,7 @@ s.scrollbar = {
         $(sb.track).on(sb.draggableEvents.start, sb.dragStart);
         $(target).on(sb.draggableEvents.move, sb.dragMove);
         $(target).on(sb.draggableEvents.end, sb.dragEnd);
+        $(target).on(sb.draggableEvents.cancel, sb.dragEnd);
     },
     disableDraggable: function () {
         var sb = s.scrollbar;
@@ -85,6 +86,7 @@ s.scrollbar = {
         $(sb.track).off(s.draggableEvents.start, sb.dragStart);
         $(target).off(s.draggableEvents.move, sb.dragMove);
         $(target).off(s.draggableEvents.end, sb.dragEnd);
+        $(target).off(s.draggableEvents.cancel, sb.dragEnd);
     },
     set: function () {
         if (!s.params.scrollbar) return;

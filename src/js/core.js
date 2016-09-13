@@ -1174,13 +1174,14 @@ s.onResize = function (forceUpdatePagination) {
   ===========================*/
 
 //Define Touch Events
-s.touchEventsDesktop = {start: 'mousedown', move: 'mousemove', end: 'mouseup'};
-if (window.navigator.pointerEnabled) s.touchEventsDesktop = {start: 'pointerdown', move: 'pointermove', end: 'pointerup'};
-else if (window.navigator.msPointerEnabled) s.touchEventsDesktop = {start: 'MSPointerDown', move: 'MSPointerMove', end: 'MSPointerUp'};
+s.touchEventsDesktop = {start: 'mousedown', move: 'mousemove', end: 'mouseup', cancel: 'mousecancel'};
+if (window.navigator.pointerEnabled) s.touchEventsDesktop = {start: 'pointerdown', move: 'pointermove', end: 'pointerup', cancel: 'pointercancel'};
+else if (window.navigator.msPointerEnabled) s.touchEventsDesktop = {start: 'MSPointerDown', move: 'MSPointerMove', end: 'MSPointerUp', cancel: 'MSPointerCancel'};
 s.touchEvents = {
     start : s.support.touch || !s.params.simulateTouch  ? 'touchstart' : s.touchEventsDesktop.start,
     move : s.support.touch || !s.params.simulateTouch ? 'touchmove' : s.touchEventsDesktop.move,
-    end : s.support.touch || !s.params.simulateTouch ? 'touchend' : s.touchEventsDesktop.end
+    end : s.support.touch || !s.params.simulateTouch ? 'touchend' : s.touchEventsDesktop.end,
+    cancel : s.support.touch || !s.params.simulateTouch ? 'touchcancel' : s.touchEventsDesktop.cancel
 };
 
 
@@ -1203,17 +1204,20 @@ s.initEvents = function (detach) {
         touchEventsTarget[action](s.touchEvents.start, s.onTouchStart, false);
         target[action](s.touchEvents.move, s.onTouchMove, moveCapture);
         target[action](s.touchEvents.end, s.onTouchEnd, false);
+        target[action](s.touchEvents.cancel, s.onTouchEnd, false);
     }
     else {
         if (s.support.touch) {
             touchEventsTarget[action](s.touchEvents.start, s.onTouchStart, false);
             touchEventsTarget[action](s.touchEvents.move, s.onTouchMove, moveCapture);
             touchEventsTarget[action](s.touchEvents.end, s.onTouchEnd, false);
+            touchEventsTarget[action](s.touchEvents.cancel, s.onTouchEnd, false);
         }
         if (params.simulateTouch && !s.device.ios && !s.device.android) {
             touchEventsTarget[action]('mousedown', s.onTouchStart, false);
             document[action]('mousemove', s.onTouchMove, moveCapture);
             document[action]('mouseup', s.onTouchEnd, false);
+            document[action]('mousecancel', s.onTouchEnd, false);
         }
     }
     window[action]('resize', s.onResize);
