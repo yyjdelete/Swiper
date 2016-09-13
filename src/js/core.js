@@ -1424,7 +1424,7 @@ s.onTouchStart = function (e) {
     if (isTouchEvent) {
         //if (e.changedTouches && e.changedTouches.length !== 1) return;//what happened?
         //if (e.targetTouches && e.targetTouches.length > 1) return;//ignore the latter
-        if (isTouched && e.touches && e.touches.length > 1) return;//ignore the latter
+        //if (isTouched && e.touches && e.touches.length > 1) return;//ignore the latter
         var targetTouch;
         //Or latter first?
         var j = 0;
@@ -1445,26 +1445,33 @@ s.onTouchStart = function (e) {
         startX = e.pageX;
         startY = e.pageY;
     }
-    s.touches.startX = startX;
-    s.touches.startY = startY;
 
     // Do NOT start if iOS edge swipe is detected. Otherwise iOS app (UIWebView) cannot swipe-to-go-back anymore
     if(s.device.ios && s.params.iOSEdgeSwipeDetection && startX <= s.params.iOSEdgeSwipeThreshold) {
         return;
     }
 
-    isTouched = true;
-    isMoved = false;
+    if (!isTouched) {
+        //do not reset when swap finger
+        isTouched = true;
+        isMoved = false;
+        isScrolling = undefined;
+        startMoving = undefined;
+        s.touches.startX = startX;
+        s.touches.startY = startY;
+        s.swipeDirection = undefined;
+    } else {
+        //swap finger
+        s.touches.startX = startX + (s.touches.startX - s.touches.currentX);
+        s.touches.startY = startY + (s.touches.startY - s.touches.currentY);
+    }
     allowTouchCallbacks = true;
-    isScrolling = undefined;
-    startMoving = undefined;
     s.touches.id = startId;//multi-touch only
-    s.touches.startX = startX;
-    s.touches.startY = startY;
+    s.touches.currentX = startX;
+    s.touches.currentY = startY;
     touchStartTime = Date.now();
     s.allowClick = true;
     s.updateContainerSize();
-    s.swipeDirection = undefined;
     if (s.params.threshold > 0) allowThresholdMove = false;
     if (e.type !== 'touchstart') {
         var preventDefault = true;
