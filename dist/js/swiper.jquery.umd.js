@@ -10,31 +10,32 @@
  * 
  * Licensed under MIT
  * 
- * Released on: February 7, 2016
+ * Released on: September 13, 2016
  */
-(function (root, factory) {
-	'use strict';
+        (function (root, factory) {
+        	'use strict';
+        
+        	if (typeof define === 'function' && define.amd) {
+        		// AMD. Register as an anonymous module.
+        		define(['jquery'], factory);
+        	} else if (typeof exports === 'object') {
+        		// Node. Does not work with strict CommonJS, but
+        		// only CommonJS-like environments that support module.exports,
+        		// like Node.
+        		module.exports = factory(require('jquery'));
+        	} else {
+        		// Browser globals (root is window)
+        		root.Swiper = factory(root.jQuery);
+        	}
+        }(this, function ($) {
+        	'use strict';
+        
 
-	if (typeof define === 'function' && define.amd) {
-		// AMD. Register as an anonymous module.
-		define(['jquery'], factory);
-	} else if (typeof exports === 'object') {
-		// Node. Does not work with strict CommonJS, but
-		// only CommonJS-like environments that support module.exports,
-		// like Node.
-		module.exports = factory(require('jquery'));
-	} else {
-		// Browser globals (root is window)
-		root.Swiper = factory(root.jQuery);
-	}
-}(this, function ($) {
-	'use strict';
-
-    /*===========================
-    Swiper
-    ===========================*/
-    var Swiper = function (container, params) {
-        if (!(this instanceof Swiper)) return new Swiper(container, params);
+        /*===========================
+        Swiper
+        ===========================*/
+        var Swiper = function (container, params) {
+            if (!(this instanceof Swiper)) return new Swiper(container, params);
 
         var defaults = {
             direction: 'horizontal',
@@ -100,6 +101,7 @@
             mousewheelSensitivity: 1,
             // Hash Navigation
             hashnav: false,
+            hashnavReplaceState: false,
             // Breakpoints
             breakpoints: undefined,
             // Slides grid
@@ -189,6 +191,7 @@
             paginationTotalClass: 'swiper-pagination-total',
             paginationHiddenClass: 'swiper-pagination-hidden',
             paginationProgressbarClass: 'swiper-pagination-progressbar',
+            lazyLoadingClass: 'swiper-lazy',
             // Observer
             observer: false,
             observeParents: false,
@@ -482,21 +485,35 @@
           ===========================*/
         s.lockSwipeToNext = function () {
             s.params.allowSwipeToNext = false;
+            if (s.params.allowSwipeToPrev === false && s.params.grabCursor) {
+                s.unsetGrabCursor();
+            }
         };
         s.lockSwipeToPrev = function () {
             s.params.allowSwipeToPrev = false;
+            if (s.params.allowSwipeToNext === false && s.params.grabCursor) {
+                s.unsetGrabCursor();
+            }
         };
         s.lockSwipes = function () {
             s.params.allowSwipeToNext = s.params.allowSwipeToPrev = false;
+            if (s.params.grabCursor) s.unsetGrabCursor();
         };
         s.unlockSwipeToNext = function () {
             s.params.allowSwipeToNext = true;
+            if (s.params.allowSwipeToPrev === true && s.params.grabCursor) {
+                s.setGrabCursor();
+            }
         };
         s.unlockSwipeToPrev = function () {
             s.params.allowSwipeToPrev = true;
+            if (s.params.allowSwipeToNext === true && s.params.grabCursor) {
+                s.setGrabCursor();
+            }
         };
         s.unlockSwipes = function () {
             s.params.allowSwipeToNext = s.params.allowSwipeToPrev = true;
+            if (s.params.grabCursor) s.setGrabCursor();
         };
         
         /*=========================
@@ -508,11 +525,17 @@
         /*=========================
           Set grab cursor
           ===========================*/
-        if (s.params.grabCursor) {
+        s.setGrabCursor = function(moving) {
             s.container[0].style.cursor = 'move';
-            s.container[0].style.cursor = '-webkit-grab';
-            s.container[0].style.cursor = '-moz-grab';
-            s.container[0].style.cursor = 'grab';
+            s.container[0].style.cursor = moving ? '-webkit-grabbing' : '-webkit-grab';
+            s.container[0].style.cursor = moving ? '-moz-grabbin' : '-moz-grab';
+            s.container[0].style.cursor = moving ? 'grabbing': 'grab';
+        };
+        s.unsetGrabCursor = function () {
+            s.container[0].style.cursor = '';
+        };
+        if (s.params.grabCursor) {
+            s.setGrabCursor();
         }
         /*=========================
           Update on Images Ready
@@ -935,6 +958,10 @@
             s.previousIndex = s.activeIndex;
             s.activeIndex = newActiveIndex;
             s.updateClasses();
+            s.updateRealIndex();
+        };
+        s.updateRealIndex = function(){
+            s.realIndex = s.slides.eq(s.activeIndex).attr('data-swiper-slide-index') || s.activeIndex;
         };
         
         /*=========================
@@ -1096,6 +1123,7 @@
                 s.scrollbar.set();
             }
             function forceSetTranslate() {
+                var translate = s.rtl ? -s.translate : s.translate;
                 newTranslate = Math.min(Math.max(s.translate, s.maxTranslate()), s.minTranslate());
                 s.setWrapperTranslate(newTranslate);
                 s.updateActiveIndex();
@@ -1185,13 +1213,14 @@
           ===========================*/
         
         //Define Touch Events
-        var desktopEvents = ['mousedown', 'mousemove', 'mouseup'];
-        if (window.navigator.pointerEnabled) desktopEvents = ['pointerdown', 'pointermove', 'pointerup'];
-        else if (window.navigator.msPointerEnabled) desktopEvents = ['MSPointerDown', 'MSPointerMove', 'MSPointerUp'];
+        s.touchEventsDesktop = {start: 'mousedown', move: 'mousemove', end: 'mouseup', cancel: 'mousecancel'};
+        if (window.navigator.pointerEnabled) s.touchEventsDesktop = {start: 'pointerdown', move: 'pointermove', end: 'pointerup', cancel: 'pointercancel'};
+        else if (window.navigator.msPointerEnabled) s.touchEventsDesktop = {start: 'MSPointerDown', move: 'MSPointerMove', end: 'MSPointerUp', cancel: 'MSPointerCancel'};
         s.touchEvents = {
-            start : s.support.touch || !s.params.simulateTouch  ? 'touchstart' : desktopEvents[0],
-            move : s.support.touch || !s.params.simulateTouch ? 'touchmove' : desktopEvents[1],
-            end : s.support.touch || !s.params.simulateTouch ? 'touchend' : desktopEvents[2]
+            start : s.support.touch || !s.params.simulateTouch  ? 'touchstart' : s.touchEventsDesktop.start,
+            move : s.support.touch || !s.params.simulateTouch ? 'touchmove' : s.touchEventsDesktop.move,
+            end : s.support.touch || !s.params.simulateTouch ? 'touchend' : s.touchEventsDesktop.end,
+            cancel : s.support.touch || !s.params.simulateTouch ? 'touchcancel' : s.touchEventsDesktop.cancel
         };
         
         
@@ -1214,17 +1243,20 @@
                 touchEventsTarget[action](s.touchEvents.start, s.onTouchStart, false);
                 target[action](s.touchEvents.move, s.onTouchMove, moveCapture);
                 target[action](s.touchEvents.end, s.onTouchEnd, false);
+                target[action](s.touchEvents.cancel, s.onTouchEnd, false);
             }
             else {
                 if (s.support.touch) {
                     touchEventsTarget[action](s.touchEvents.start, s.onTouchStart, false);
                     touchEventsTarget[action](s.touchEvents.move, s.onTouchMove, moveCapture);
                     touchEventsTarget[action](s.touchEvents.end, s.onTouchEnd, false);
+                    touchEventsTarget[action](s.touchEvents.cancel, s.onTouchEnd, false);
                 }
                 if (params.simulateTouch && !s.device.ios && !s.device.android) {
                     touchEventsTarget[action]('mousedown', s.onTouchStart, false);
                     document[action]('mousemove', s.onTouchMove, moveCapture);
                     document[action]('mouseup', s.onTouchEnd, false);
+                    document[action]('mousecancel', s.onTouchEnd, false);
                 }
             }
             window[action]('resize', s.onResize);
@@ -1385,6 +1417,7 @@
         
         // Touches information
         s.touches = {
+            id: undefined,
             startX: 0,
             startY: 0,
             currentX: 0,
@@ -1394,8 +1427,29 @@
         
         // Touch handlers
         var isTouchEvent, startMoving;
+        var touchDebug = false;
+        var logTouch = function (e, touchType) {
+            var touches = e[touchType];
+            if (!touches) return null;
+            var sb = '';
+            var len = touches.length;
+            sb = sb + len + ',[';
+            for (var i = 0; i < len; ++i) {
+                sb = sb + touches[i].identifier + ',';
+            }
+            sb = sb + ']';
+            console.log(touchType + ':' + sb);
+        };
+        var logTouchEvent = function (e) {
+            if(!touchDebug) return;
+            console.log(e.type);
+            logTouch(e, 'touches');
+            logTouch(e, 'targetTouches');
+            logTouch(e, 'changedTouches');
+        };
         s.onTouchStart = function (e) {
             if (e.originalEvent) e = e.originalEvent;
+            logTouchEvent(e);
             isTouchEvent = e.type === 'touchstart';
             if (!isTouchEvent && 'which' in e && e.which === 3) return;
             if (s.params.noSwiping && findElementInEvent(e, '.' + s.params.noSwipingClass)) {
@@ -1406,25 +1460,57 @@
                 if (!findElementInEvent(e, s.params.swipeHandler)) return;
             }
         
-            var startX = s.touches.currentX = e.type === 'touchstart' ? e.targetTouches[0].pageX : e.pageX;
-            var startY = s.touches.currentY = e.type === 'touchstart' ? e.targetTouches[0].pageY : e.pageY;
+            var startX, startY, startId;
+            if (isTouchEvent) {
+                //if (e.changedTouches && e.changedTouches.length !== 1) return;//what happened?
+                //if (e.targetTouches && e.targetTouches.length > 1) return;//ignore the latter
+                //if (isTouched && e.touches && e.touches.length > 1) return;//ignore the latter
+                var targetTouch;
+                //Or latter first?
+                for (var j = e.changedTouches.length - 1; j >= 0; --j) {
+                    for (var i = e.targetTouches.length - 1; i >= 0; --i) {
+                        if (e.changedTouches[j].identifier === e.targetTouches[i].identifier) {
+                            targetTouch = e.changedTouches[j];
+                            break;
+                        }
+                    }
+                }
+                //ignore
+                if (!targetTouch) return;
+                startX = targetTouch.pageX;
+                startY = targetTouch.pageY;
+                startId = targetTouch.identifier;
+            } else {
+                startX = e.pageX;
+                startY = e.pageY;
+            }
         
             // Do NOT start if iOS edge swipe is detected. Otherwise iOS app (UIWebView) cannot swipe-to-go-back anymore
             if(s.device.ios && s.params.iOSEdgeSwipeDetection && startX <= s.params.iOSEdgeSwipeThreshold) {
                 return;
             }
         
-            isTouched = true;
-            isMoved = false;
+            if (!isTouched) {
+                //do not reset when swap finger
+                isTouched = true;
+                isMoved = false;
+                isScrolling = undefined;
+                startMoving = undefined;
+                s.touches.startX = startX;
+                s.touches.startY = startY;
+                s.swipeDirection = undefined;
+            } else {
+                //swap finger
+                s.touches.startX = startX + (s.touches.startX - s.touches.currentX);
+                s.touches.startY = startY + (s.touches.startY - s.touches.currentY);
+            }
             allowTouchCallbacks = true;
-            isScrolling = undefined;
-            startMoving = undefined;
-            s.touches.startX = startX;
-            s.touches.startY = startY;
+            s.touches.id = startId;//multi-touch only
+            s.touches.currentX = startX;
+            s.touches.currentY = startY;
             touchStartTime = Date.now();
             s.allowClick = true;
             s.updateContainerSize();
-            s.swipeDirection = undefined;
             if (s.params.threshold > 0) allowThresholdMove = false;
             if (e.type !== 'touchstart') {
                 var preventDefault = true;
@@ -1441,18 +1527,36 @@
         
         s.onTouchMove = function (e) {
             if (e.originalEvent) e = e.originalEvent;
-            if (isTouchEvent && e.type === 'mousemove') return;
+            logTouchEvent(e);
+            var curIsTouchEvent = e.type === 'touchmove';
+            if (isTouchEvent && e.type === 'mousemove') return;//!=='touchmove'??
+            var curTarget;
+            if (curIsTouchEvent) {
+                for (var i = 0, len = e.targetTouches.length; i < len; ++i) {
+                    if (s.touches.id === undefined ||
+                        e.targetTouches[i].identifier === s.touches.id) {
+        
+                        curTarget = e.targetTouches[i];
+                        break;
+                    }
+                }
+                //ignore no-tracking event
+                if (!curTarget) return;
+            } else {
+                curTarget = e;
+            }
+        
             if (e.preventedByNestedSwiper) {
-                s.touches.startX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
-                s.touches.startY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
+                s.touches.startX = curTarget.pageX;
+                s.touches.startY = curTarget.pageY;
                 return;
             }
             if (s.params.onlyExternal) {
                 // isMoved = true;
                 s.allowClick = false;
                 if (isTouched) {
-                    s.touches.startX = s.touches.currentX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
-                    s.touches.startY = s.touches.currentY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
+                    s.touches.startX = s.touches.currentX = curTarget.pageX;
+                    s.touches.startY = s.touches.currentY = curTarget.pageY;
                     touchStartTime = Date.now();
                 }
                 return;
@@ -1467,10 +1571,10 @@
             if (allowTouchCallbacks) {
                 s.emit('onTouchMove', s, e);
             }
-            if (e.targetTouches && e.targetTouches.length > 1) return;
+            //if (e.scale && e.scale !== 1) return;
         
-            s.touches.currentX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
-            s.touches.currentY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
+            s.touches.currentX = curTarget.pageX;
+            s.touches.currentY = curTarget.pageY;
         
             if (typeof isScrolling === 'undefined') {
                 var touchAngle = Math.atan2(Math.abs(s.touches.currentY - s.touches.startY), Math.abs(s.touches.currentX - s.touches.startX)) * 180 / Math.PI;
@@ -1518,11 +1622,8 @@
                 }
                 allowMomentumBounce = false;
                 //Grab Cursor
-                if (s.params.grabCursor) {
-                    s.container[0].style.cursor = 'move';
-                    s.container[0].style.cursor = '-webkit-grabbing';
-                    s.container[0].style.cursor = '-moz-grabbin';
-                    s.container[0].style.cursor = 'grabbing';
+                if (s.params.grabCursor && (s.params.allowSwipeToNext === true || s.params.allowSwipeToPrev === true)) {
+                    s.setGrabCursor(true);
                 }
             }
             isMoved = true;
@@ -1600,17 +1701,28 @@
         };
         s.onTouchEnd = function (e) {
             if (e.originalEvent) e = e.originalEvent;
+            logTouchEvent(e);
+            if (e.type === 'touchend' || e.type === 'touchcancel') {
+                if (s.touches.id !== undefined) {
+                    var targetTouch;
+                    for (var k = 0, len = e.changedTouches.length; k < len; ++k) {
+                        if (e.changedTouches[k].identifier === s.touches.id) {
+                            targetTouch = e.changedTouches[k];
+                            break;
+                        }
+                    }
+                    //ignore no-tracking event
+                    if (!targetTouch) return;
+                }
+            }
             if (allowTouchCallbacks) {
                 s.emit('onTouchEnd', s, e);
             }
             allowTouchCallbacks = false;
             if (!isTouched) return;
             //Return Grab Cursor
-            if (s.params.grabCursor && isMoved && isTouched) {
-                s.container[0].style.cursor = 'move';
-                s.container[0].style.cursor = '-webkit-grab';
-                s.container[0].style.cursor = '-moz-grab';
-                s.container[0].style.cursor = 'grab';
+            if (s.params.grabCursor && isMoved && isTouched  && (s.params.allowSwipeToNext === true || s.params.allowSwipeToPrev === true)) {
+                s.setGrabCursor(false);
             }
         
             // Time diff
@@ -1896,7 +2008,7 @@
             if (typeof speed === 'undefined') speed = s.params.speed;
             s.previousIndex = s.activeIndex || 0;
             s.activeIndex = slideIndex;
-        
+            s.updateRealIndex();
             if ((s.rtl && -translate === s.translate) || (!s.rtl && translate === s.translate)) {
                 // Update Height
                 if (s.params.autoHeight) {
@@ -2000,6 +2112,15 @@
         };
         s.slideReset = function (runCallbacks, speed, internal) {
             return s.slideTo(s.activeIndex, speed, runCallbacks);
+        };
+        
+        s.disableTouchControl = function () {
+            s.params.onlyExternal = true;
+            return true;
+        };
+        s.enableTouchControl = function () {
+            s.params.onlyExternal = false;
+            return true;
         };
         
         /*=========================
@@ -2614,8 +2735,8 @@
                 if (s.slides.length === 0) return;
         
                 var slide = s.slides.eq(index);
-                var img = slide.find('.swiper-lazy:not(.swiper-lazy-loaded):not(.swiper-lazy-loading)');
-                if (slide.hasClass('swiper-lazy') && !slide.hasClass('swiper-lazy-loaded') && !slide.hasClass('swiper-lazy-loading')) {
+                var img = slide.find('.' + s.params.lazyLoadingClass + ':not(.swiper-lazy-loaded):not(.swiper-lazy-loading)');
+                if (slide.hasClass(s.params.lazyLoadingClass) && !slide.hasClass('swiper-lazy-loaded') && !slide.hasClass('swiper-lazy-loading')) {
                     img = img.add(slide[0]);
                 }
                 if (img.length === 0) return;
@@ -2749,6 +2870,7 @@
                 sb.isTouched = true;
                 e.preventDefault();
                 e.stopPropagation();
+                if (e.touches && e.touches.length > 1) return;
         
                 sb.setDragPosition(e);
                 clearTimeout(sb.dragTimeout);
@@ -2766,6 +2888,7 @@
                 if (!sb.isTouched) return;
                 if (e.preventDefault) e.preventDefault();
                 else e.returnValue = false;
+                if (e.touches && e.touches.length > 1) return;
                 sb.setDragPosition(e);
                 s.wrapper.transition(0);
                 sb.track.transition(0);
@@ -2773,6 +2896,7 @@
                 s.emit('onScrollbarDragMove', s);
             },
             dragEnd: function (e) {
+                if (e.touches && e.touches.length > 0) return;
                 var sb = s.scrollbar;
                 if (!sb.isTouched) return;
                 sb.isTouched = false;
@@ -2789,19 +2913,25 @@
                     s.slideReset();
                 }
             },
+            draggableEvents: (function () {
+                if ((s.params.simulateTouch === false && !s.support.touch)) return s.touchEventsDesktop;
+                else return s.touchEvents;
+            })(),
             enableDraggable: function () {
                 var sb = s.scrollbar;
                 var target = s.support.touch ? sb.track : document;
-                $(sb.track).on(s.touchEvents.start, sb.dragStart);
-                $(target).on(s.touchEvents.move, sb.dragMove);
-                $(target).on(s.touchEvents.end, sb.dragEnd);
+                $(sb.track).on(sb.draggableEvents.start, sb.dragStart);
+                $(target).on(sb.draggableEvents.move, sb.dragMove);
+                $(target).on(sb.draggableEvents.end, sb.dragEnd);
+                $(target).on(sb.draggableEvents.cancel, sb.dragEnd);
             },
             disableDraggable: function () {
                 var sb = s.scrollbar;
                 var target = s.support.touch ? sb.track : document;
-                $(sb.track).off(s.touchEvents.start, sb.dragStart);
-                $(target).off(s.touchEvents.move, sb.dragMove);
-                $(target).off(s.touchEvents.end, sb.dragEnd);
+                $(sb.track).off(sb.draggableEvents.start, sb.dragStart);
+                $(target).off(sb.draggableEvents.move, sb.dragMove);
+                $(target).off(sb.draggableEvents.end, sb.dragEnd);
+                $(target).off(sb.draggableEvents.cancel, sb.dragEnd);
             },
             set: function () {
                 if (!s.params.scrollbar) return;
@@ -3039,7 +3169,10 @@
             },
             setHash: function () {
                 if (!s.hashnav.initialized || !s.params.hashnav) return;
-                document.location.hash = s.slides.eq(s.activeIndex).attr('data-hash') || '';
+                if (s.params.hashnavReplaceState && window.history && window.history.replaceState) {
+                    window.history.replaceState(null, null, ('#' + s.slides.eq(s.activeIndex).attr('data-hash') || ''));
+                }
+                else document.location.hash = s.slides.eq(s.activeIndex).attr('data-hash') || '';
             }
         };
 
@@ -3628,143 +3761,144 @@
         s.init();
         
 
-    
-        // Return swiper instance
-        return s;
-    };
-    
-
-    /*==================================================
-        Prototype
-    ====================================================*/
-    Swiper.prototype = {
-        isSafari: (function () {
-            var ua = navigator.userAgent.toLowerCase();
-            return (ua.indexOf('safari') >= 0 && ua.indexOf('chrome') < 0 && ua.indexOf('android') < 0);
-        })(),
-        isUiWebView: /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent),
-        isArray: function (arr) {
-            return Object.prototype.toString.apply(arr) === '[object Array]';
-        },
-        /*==================================================
-        Browser
-        ====================================================*/
-        browser: {
-            ie: window.navigator.pointerEnabled || window.navigator.msPointerEnabled,
-            ieTouch: (window.navigator.msPointerEnabled && window.navigator.msMaxTouchPoints > 1) || (window.navigator.pointerEnabled && window.navigator.maxTouchPoints > 1)
-        },
-        /*==================================================
-        Devices
-        ====================================================*/
-        device: (function () {
-            var ua = navigator.userAgent;
-            var android = ua.match(/(Android);?[\s\/]+([\d.]+)?/);
-            var ipad = ua.match(/(iPad).*OS\s([\d_]+)/);
-            var ipod = ua.match(/(iPod)(.*OS\s([\d_]+))?/);
-            var iphone = !ipad && ua.match(/(iPhone\sOS)\s([\d_]+)/);
-            return {
-                ios: ipad || iphone || ipod,
-                android: android
-            };
-        })(),
-        /*==================================================
-        Feature Detection
-        ====================================================*/
-        support: {
-            touch : (window.Modernizr && Modernizr.touch === true) || (function () {
-                return !!(('ontouchstart' in window) || window.DocumentTouch && document instanceof DocumentTouch);
-            })(),
-    
-            transforms3d : (window.Modernizr && Modernizr.csstransforms3d === true) || (function () {
-                var div = document.createElement('div').style;
-                return ('webkitPerspective' in div || 'MozPerspective' in div || 'OPerspective' in div || 'MsPerspective' in div || 'perspective' in div);
-            })(),
-    
-            flexbox: (function () {
-                var div = document.createElement('div').style;
-                var styles = ('alignItems webkitAlignItems webkitBoxAlign msFlexAlign mozBoxAlign webkitFlexDirection msFlexDirection mozBoxDirection mozBoxOrient webkitBoxDirection webkitBoxOrient').split(' ');
-                for (var i = 0; i < styles.length; i++) {
-                    if (styles[i] in div) return true;
-                }
-            })(),
-    
-            observer: (function () {
-                return ('MutationObserver' in window || 'WebkitMutationObserver' in window);
-            })()
-        },
-        /*==================================================
-        Plugins
-        ====================================================*/
-        plugins: {}
-    };
-    
-
-    /*===========================
-     Get jQuery
-     ===========================*/
-    
-    addLibraryPlugin($);
-    
-    var domLib = $;
-
-    /*===========================
-    Add .swiper plugin from Dom libraries
-    ===========================*/
-    function addLibraryPlugin(lib) {
-        lib.fn.swiper = function (params) {
-            var firstInstance;
-            lib(this).each(function () {
-                var s = new Swiper(this, params);
-                if (!firstInstance) firstInstance = s;
-            });
-            return firstInstance;
+        
+            // Return swiper instance
+            return s;
         };
-    }
-    
-    if (domLib) {
-        if (!('transitionEnd' in domLib.fn)) {
-            domLib.fn.transitionEnd = function (callback) {
-                var events = ['webkitTransitionEnd', 'transitionend', 'oTransitionEnd', 'MSTransitionEnd', 'msTransitionEnd'],
-                    i, j, dom = this;
-                function fireCallBack(e) {
-                    /*jshint validthis:true */
-                    if (e.target !== this) return;
-                    callback.call(this, e);
-                    for (i = 0; i < events.length; i++) {
-                        dom.off(events[i], fireCallBack);
-                    }
-                }
-                if (callback) {
-                    for (i = 0; i < events.length; i++) {
-                        dom.on(events[i], fireCallBack);
-                    }
-                }
-                return this;
-            };
-        }
-        if (!('transform' in domLib.fn)) {
-            domLib.fn.transform = function (transform) {
-                for (var i = 0; i < this.length; i++) {
-                    var elStyle = this[i].style;
-                    elStyle.webkitTransform = elStyle.MsTransform = elStyle.msTransform = elStyle.MozTransform = elStyle.OTransform = elStyle.transform = transform;
-                }
-                return this;
-            };
-        }
-        if (!('transition' in domLib.fn)) {
-            domLib.fn.transition = function (duration) {
-                if (typeof duration !== 'string') {
-                    duration = duration + 'ms';
-                }
-                for (var i = 0; i < this.length; i++) {
-                    var elStyle = this[i].style;
-                    elStyle.webkitTransitionDuration = elStyle.MsTransitionDuration = elStyle.msTransitionDuration = elStyle.MozTransitionDuration = elStyle.OTransitionDuration = elStyle.transitionDuration = duration;
-                }
-                return this;
-            };
-        }
-    }
+        
 
-	return Swiper;
-}));
+        /*==================================================
+            Prototype
+        ====================================================*/
+        Swiper.prototype = {
+            isSafari: (function () {
+                var ua = navigator.userAgent.toLowerCase();
+                return (ua.indexOf('safari') >= 0 && ua.indexOf('chrome') < 0 && ua.indexOf('android') < 0);
+            })(),
+            isUiWebView: /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent),
+            isArray: function (arr) {
+                return Object.prototype.toString.apply(arr) === '[object Array]';
+            },
+            /*==================================================
+            Browser
+            ====================================================*/
+            browser: {
+                ie: window.navigator.pointerEnabled || window.navigator.msPointerEnabled,
+                ieTouch: (window.navigator.msPointerEnabled && window.navigator.msMaxTouchPoints > 1) || (window.navigator.pointerEnabled && window.navigator.maxTouchPoints > 1)
+            },
+            /*==================================================
+            Devices
+            ====================================================*/
+            device: (function () {
+                var ua = navigator.userAgent;
+                var android = ua.match(/(Android);?[\s\/]+([\d.]+)?/);
+                var ipad = ua.match(/(iPad).*OS\s([\d_]+)/);
+                var ipod = ua.match(/(iPod)(.*OS\s([\d_]+))?/);
+                var iphone = !ipad && ua.match(/(iPhone\sOS)\s([\d_]+)/);
+                return {
+                    ios: ipad || iphone || ipod,
+                    android: android
+                };
+            })(),
+            /*==================================================
+            Feature Detection
+            ====================================================*/
+            support: {
+                touch : (window.Modernizr && Modernizr.touch === true) || (function () {
+                    return !!(('ontouchstart' in window) || window.DocumentTouch && document instanceof DocumentTouch);
+                })(),
+        
+                transforms3d : (window.Modernizr && Modernizr.csstransforms3d === true) || (function () {
+                    var div = document.createElement('div').style;
+                    return ('webkitPerspective' in div || 'MozPerspective' in div || 'OPerspective' in div || 'MsPerspective' in div || 'perspective' in div);
+                })(),
+        
+                flexbox: (function () {
+                    var div = document.createElement('div').style;
+                    var styles = ('alignItems webkitAlignItems webkitBoxAlign msFlexAlign mozBoxAlign webkitFlexDirection msFlexDirection mozBoxDirection mozBoxOrient webkitBoxDirection webkitBoxOrient').split(' ');
+                    for (var i = 0; i < styles.length; i++) {
+                        if (styles[i] in div) return true;
+                    }
+                })(),
+        
+                observer: (function () {
+                    return ('MutationObserver' in window || 'WebkitMutationObserver' in window);
+                })()
+            },
+            /*==================================================
+            Plugins
+            ====================================================*/
+            plugins: {}
+        };
+        
+
+        /*===========================
+         Get jQuery
+         ===========================*/
+        
+        addLibraryPlugin($);
+        
+        var domLib = $;
+
+        /*===========================
+        Add .swiper plugin from Dom libraries
+        ===========================*/
+        function addLibraryPlugin(lib) {
+            lib.fn.swiper = function (params) {
+                var firstInstance;
+                lib(this).each(function () {
+                    var s = new Swiper(this, params);
+                    if (!firstInstance) firstInstance = s;
+                });
+                return firstInstance;
+            };
+        }
+        
+        if (domLib) {
+            if (!('transitionEnd' in domLib.fn)) {
+                domLib.fn.transitionEnd = function (callback) {
+                    var events = ['webkitTransitionEnd', 'transitionend', 'oTransitionEnd', 'MSTransitionEnd', 'msTransitionEnd'],
+                        i, j, dom = this;
+                    function fireCallBack(e) {
+                        /*jshint validthis:true */
+                        if (e.target !== this) return;
+                        callback.call(this, e);
+                        for (i = 0; i < events.length; i++) {
+                            dom.off(events[i], fireCallBack);
+                        }
+                    }
+                    if (callback) {
+                        for (i = 0; i < events.length; i++) {
+                            dom.on(events[i], fireCallBack);
+                        }
+                    }
+                    return this;
+                };
+            }
+            if (!('transform' in domLib.fn)) {
+                domLib.fn.transform = function (transform) {
+                    for (var i = 0; i < this.length; i++) {
+                        var elStyle = this[i].style;
+                        elStyle.webkitTransform = elStyle.MsTransform = elStyle.msTransform = elStyle.MozTransform = elStyle.OTransform = elStyle.transform = transform;
+                    }
+                    return this;
+                };
+            }
+            if (!('transition' in domLib.fn)) {
+                domLib.fn.transition = function (duration) {
+                    if (typeof duration !== 'string') {
+                        duration = duration + 'ms';
+                    }
+                    for (var i = 0; i < this.length; i++) {
+                        var elStyle = this[i].style;
+                        elStyle.webkitTransitionDuration = elStyle.MsTransitionDuration = elStyle.msTransitionDuration = elStyle.MozTransitionDuration = elStyle.OTransitionDuration = elStyle.transitionDuration = duration;
+                    }
+                    return this;
+                };
+            }
+        }
+
+        	return Swiper;
+        }));
+
 //# sourceMappingURL=maps/swiper.jquery.umd.js.map
