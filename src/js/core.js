@@ -1378,6 +1378,7 @@ s.animating = false;
 
 // Touches information
 s.touches = {
+    id: undefined,
     startX: 0,
     startY: 0,
     currentX: 0,
@@ -1387,8 +1388,28 @@ s.touches = {
 
 // Touch handlers
 var isTouchEvent, startMoving;
+var logTouch = function (e, touchType) {
+    var touches = e[touchType];
+    if (!touches) return null;
+    var sb = '';
+    var len = touches.length;
+    sb = sb + len + ",["
+    for (var i = 0; i < len; ++i) {
+        sb = sb + touches[i].identifier + ",";
+    }
+    sb = sb + "]";
+    console.log(touchType + ":" + sb);
+};
+var logTouchEvent = function (e) {
+    return;
+    console.log(e.type);
+    logTouch(e, "touches");
+    logTouch(e, "targetTouches");
+    logTouch(e, "changedTouches");
+};
 s.onTouchStart = function (e) {
     if (e.originalEvent) e = e.originalEvent;
+    logTouchEvent(e);
     isTouchEvent = e.type === 'touchstart';
     if (!isTouchEvent && 'which' in e && e.which === 3) return;
     if (s.params.noSwiping && findElementInEvent(e, '.' + s.params.noSwipingClass)) {
@@ -1398,10 +1419,34 @@ s.onTouchStart = function (e) {
     if (s.params.swipeHandler) {
         if (!findElementInEvent(e, s.params.swipeHandler)) return;
     }
-    if (e.touches && e.touches.length > 1) return;
 
-    var startX = s.touches.currentX = e.type === 'touchstart' ? e.targetTouches[0].pageX : e.pageX;
-    var startY = s.touches.currentY = e.type === 'touchstart' ? e.targetTouches[0].pageY : e.pageY;
+    var startX, startY, startId;
+    if (isTouchEvent) {
+        //if (e.changedTouches && e.changedTouches.length !== 1) return;//what happened?
+        //if (e.targetTouches && e.targetTouches.length > 1) return;//ignore the latter
+        if (isTouched && e.touches && e.touches.length > 1) return;//ignore the latter
+        var targetTouch;
+        //Or latter first?
+        var j = 0;
+        for (var j = e.changedTouches.length - 1; j >= 0; --j) {
+            for (var i = e.targetTouches.length - 1; i >= 0; --i) {
+                if (e.changedTouches[j].identifier === e.targetTouches[i].identifier) {
+                    targetTouch = e.changedTouches[j];
+                    break;
+                }
+            }
+        }
+        //ignore
+        if (!targetTouch) return;
+        startX = targetTouch.pageX;
+        startY = targetTouch.pageY;
+        startId = targetTouch.identifier;
+    } else {
+        startX = e.pageX;
+        startY = e.pageY;
+    }
+    s.touches.startX = startX;
+    s.touches.startY = startY;
 
     // Do NOT start if iOS edge swipe is detected. Otherwise iOS app (UIWebView) cannot swipe-to-go-back anymore
     if(s.device.ios && s.params.iOSEdgeSwipeDetection && startX <= s.params.iOSEdgeSwipeThreshold) {
@@ -1413,6 +1458,7 @@ s.onTouchStart = function (e) {
     allowTouchCallbacks = true;
     isScrolling = undefined;
     startMoving = undefined;
+    s.touches.id = startId;//multi-touch only
     s.touches.startX = startX;
     s.touches.startY = startY;
     touchStartTime = Date.now();
@@ -1435,19 +1481,36 @@ s.onTouchStart = function (e) {
 
 s.onTouchMove = function (e) {
     if (e.originalEvent) e = e.originalEvent;
-    if (isTouchEvent && e.type === 'mousemove') return;
-    if (e.touches && e.touches.length > 1) return;
+    logTouchEvent(e);
+    var curIsTouchEvent = e.type === 'touchmove';
+    if (isTouchEvent && e.type === 'mousemove') return;//!=='touchmove'??
+    var curTarget;
+    if (curIsTouchEvent) {
+        for (var i = 0, len = e.targetTouches.length; i < len; ++i) {
+            if (s.touches.id == undefined ||
+                e.targetTouches[i].identifier === s.touches.id) {
+
+                curTarget = e.targetTouches[i];
+                break;
+            }
+        }
+        //ignore no-tracking event
+        if (!curTarget) return;
+    } else {
+        curTarget = e;
+    }
+
     if (e.preventedByNestedSwiper) {
-        s.touches.startX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
-        s.touches.startY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
+        s.touches.startX = curTarget.pageX;
+        s.touches.startY = curTarget.pageY;
         return;
     }
     if (s.params.onlyExternal) {
         // isMoved = true;
         s.allowClick = false;
         if (isTouched) {
-            s.touches.startX = s.touches.currentX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
-            s.touches.startY = s.touches.currentY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
+            s.touches.startX = s.touches.currentX = curTarget.pageX;
+            s.touches.startY = s.touches.currentY = curTarget.pageY;
             touchStartTime = Date.now();
         }
         return;
@@ -1462,10 +1525,10 @@ s.onTouchMove = function (e) {
     if (allowTouchCallbacks) {
         s.emit('onTouchMove', s, e);
     }
-    if (e.targetTouches && e.targetTouches.length > 1) return;
+    //if (e.scale && e.scale !== 1) return;
 
-    s.touches.currentX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.pageX;
-    s.touches.currentY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.pageY;
+    s.touches.currentX = curTarget.pageX;
+    s.touches.currentY = curTarget.pageY;
 
     if (typeof isScrolling === 'undefined') {
         var touchAngle = Math.atan2(Math.abs(s.touches.currentY - s.touches.startY), Math.abs(s.touches.currentX - s.touches.startX)) * 180 / Math.PI;
@@ -1592,6 +1655,20 @@ s.onTouchMove = function (e) {
 };
 s.onTouchEnd = function (e) {
     if (e.originalEvent) e = e.originalEvent;
+    logTouchEvent(e);
+    if (e.type === 'touchend' || e.type === 'touchcancel') {
+        if (s.touches.id != undefined) {
+            var targetTouch;
+            for (var i = 0, len = e.changedTouches.length; i < len; ++i) {
+                if (e.changedTouches[i].identifier === s.touches.id) {
+                    targetTouch = e.changedTouches[i];
+                    break;
+                }
+            }
+            //ignore no-tracking event
+            if (!targetTouch) return;
+        }
+    }
     if (allowTouchCallbacks) {
         s.emit('onTouchEnd', s, e);
     }
