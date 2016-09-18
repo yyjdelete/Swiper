@@ -10,7 +10,7 @@
  * 
  * Licensed under MIT
  * 
- * Released on: September 13, 2016
+ * Released on: September 18, 2016
  */
         (function () {
             'use strict';
@@ -86,7 +86,9 @@
             mousewheelSensitivity: 1,
             // Hash Navigation
             hashnav: false,
-            hashnavReplaceState: false,
+            replaceState: false,
+            // History
+            history: false,
             // Breakpoints
             breakpoints: undefined,
             // Slides grid
@@ -155,6 +157,7 @@
             control: undefined,
             controlInverse: false,
             controlBy: 'slide', //or 'container'
+            normalizeSlideIndex: true,
             // Swiping/no swiping
             allowSwipeToPrev: true,
             allowSwipeToNext: true,
@@ -162,6 +165,7 @@
             noSwiping: true,
             noSwipingClass: 'swiper-no-swiping',
             // NS
+            containerModifierClass: 'swiper-container-', // NEW
             slideClass: 'swiper-slide',
             slideActiveClass: 'swiper-slide-active',
             slideVisibleClass: 'swiper-slide-visible',
@@ -176,7 +180,15 @@
             paginationTotalClass: 'swiper-pagination-total',
             paginationHiddenClass: 'swiper-pagination-hidden',
             paginationProgressbarClass: 'swiper-pagination-progressbar',
+            paginationClickableClass: 'swiper-pagination-clickable', // NEW
+            paginationModifierClass: 'swiper-pagination-', // NEW
             lazyLoadingClass: 'swiper-lazy',
+            lazyStatusLoadingClass: 'swiper-lazy-loading',
+            lazyStatusLoadedClass: 'swiper-lazy-loaded',
+            lazyPreloaderClass: 'swiper-lazy-preloader',
+            notificationClass: 'swiper-notification',
+            preloaderClass: 'preloader',
+        
             // Observer
             observer: false,
             observeParents: false,
@@ -336,17 +348,17 @@
         s.container[0].swiper = s;
         s.container.data('swiper', s);
         
-        s.classNames.push('swiper-container-' + s.params.direction);
+        s.classNames.push(s.params.containerModifierClass + s.params.direction);
         
         if (s.params.freeMode) {
-            s.classNames.push('swiper-container-free-mode');
+            s.classNames.push(s.params.containerModifierClass + 'free-mode');
         }
         if (!s.support.flexbox) {
-            s.classNames.push('swiper-container-no-flexbox');
+            s.classNames.push(s.params.containerModifierClass + 'no-flexbox');
             s.params.slidesPerColumn = 1;
         }
         if (s.params.autoHeight) {
-            s.classNames.push('swiper-container-autoheight');
+            s.classNames.push(s.params.containerModifierClass + 'autoheight');
         }
         // Enable slides progress when required
         if (s.params.parallax || s.params.watchSlidesVisibility) {
@@ -356,14 +368,14 @@
         if (['cube', 'coverflow', 'flip'].indexOf(s.params.effect) >= 0) {
             if (s.support.transforms3d) {
                 s.params.watchSlidesProgress = true;
-                s.classNames.push('swiper-container-3d');
+                s.classNames.push(s.params.containerModifierClass + '3d');
             }
             else {
                 s.params.effect = 'slide';
             }
         }
         if (s.params.effect !== 'slide') {
-            s.classNames.push('swiper-container-' + s.params.effect);
+            s.classNames.push(s.params.containerModifierClass + s.params.effect);
         }
         if (s.params.effect === 'cube') {
             s.params.resistanceRatio = 0;
@@ -403,12 +415,12 @@
             }
         
             if (s.params.paginationType === 'bullets' && s.params.paginationClickable) {
-                s.paginationContainer.addClass('swiper-pagination-clickable');
+                s.paginationContainer.addClass(s.params.paginationModifierClass + 'clickable');
             }
             else {
                 s.params.paginationClickable = false;
             }
-            s.paginationContainer.addClass('swiper-pagination-' + s.params.paginationType);
+            s.paginationContainer.addClass(s.params.paginationModifierClass + s.params.paginationType);
         }
         // Next/Prev Buttons
         if (s.params.nextButton || s.params.prevButton) {
@@ -435,7 +447,7 @@
         // RTL
         s.rtl = s.isHorizontal() && (s.container[0].dir.toLowerCase() === 'rtl' || s.container.css('direction') === 'rtl');
         if (s.rtl) {
-            s.classNames.push('swiper-container-rtl');
+            s.classNames.push(s.params.containerModifierClass + 'rtl');
         }
         
         // Wrong RTL support
@@ -445,12 +457,12 @@
         
         // Columns
         if (s.params.slidesPerColumn > 1) {
-            s.classNames.push('swiper-container-multirow');
+            s.classNames.push(s.params.containerModifierClass + 'multirow');
         }
         
         // Check for Android
         if (s.device.android) {
-            s.classNames.push('swiper-container-android');
+            s.classNames.push(s.params.containerModifierClass + 'android');
         }
         
         // Add classes
@@ -646,12 +658,30 @@
           Slider/slides sizes
           ===========================*/
         s.updateAutoHeight = function () {
-            // Update Height
-            var slide = s.slides.eq(s.activeIndex)[0];
-            if (typeof slide !== 'undefined') {
-                var newHeight = slide.offsetHeight;
-                if (newHeight) s.wrapper.css('height', newHeight + 'px');
+            var activeSlides = [];
+            var newHeight = 0;
+        
+            // Find slides currently in view
+            if(s.params.slidesPerView !== 'auto' && s.params.slidesPerView > 1) {
+                for (i = 0; i < Math.ceil(s.params.slidesPerView); i++) {
+                    var index = s.activeIndex + i;
+                    if(index > s.slides.length) break;
+                    activeSlides.push(s.slides.eq(index)[0]);
+                }
+            } else {
+                activeSlides.push(s.slides.eq(s.activeIndex)[0]);
             }
+        
+            // Find new height from heighest slide in view
+            for (i = 0; i < activeSlides.length; i++) {
+                if (typeof activeSlides[i] !== 'undefined') {
+                    var height = activeSlides[i].offsetHeight;
+                    newHeight = height > newHeight ? height : newHeight;
+                }
+            }
+        
+            // Update Height
+            if (newHeight) s.wrapper.css('height', newHeight + 'px');
         };
         s.updateContainerSize = function () {
             var width, height;
@@ -927,7 +957,9 @@
                 }
             }
             // Normalize slideIndex
-            if (newActiveIndex < 0 || typeof newActiveIndex === 'undefined') newActiveIndex = 0;
+            if(s.params.normalizeSlideIndex){
+                if (newActiveIndex < 0 || typeof newActiveIndex === 'undefined') newActiveIndex = 0;
+            }
             // for (i = 0; i < s.slidesGrid.length; i++) {
                 // if (- translate >= s.slidesGrid[i]) {
                     // newActiveIndex = i;
@@ -1353,7 +1385,7 @@
                     if (s.params.centeredSlides) {
                         if ((slideToIndex < s.loopedSlides - s.params.slidesPerView/2) || (slideToIndex > s.slides.length - s.loopedSlides + s.params.slidesPerView/2)) {
                             s.fixLoop();
-                            slideToIndex = s.wrapper.children('.' + s.params.slideClass + '[data-swiper-slide-index="' + realIndex + '"]:not(.swiper-slide-duplicate)').eq(0).index();
+                            slideToIndex = s.wrapper.children('.' + s.params.slideClass + '[data-swiper-slide-index="' + realIndex + '"]:not(.' + s.params.slideDuplicateClass + ')').eq(0).index();
                             setTimeout(function () {
                                 s.slideTo(slideToIndex);
                             }, 0);
@@ -1365,7 +1397,7 @@
                     else {
                         if (slideToIndex > s.slides.length - s.params.slidesPerView) {
                             s.fixLoop();
-                            slideToIndex = s.wrapper.children('.' + s.params.slideClass + '[data-swiper-slide-index="' + realIndex + '"]:not(.swiper-slide-duplicate)').eq(0).index();
+                            slideToIndex = s.wrapper.children('.' + s.params.slideClass + '[data-swiper-slide-index="' + realIndex + '"]:not(.' + s.params.slideDuplicateClass + ')').eq(0).index();
                             setTimeout(function () {
                                 s.slideTo(slideToIndex);
                             }, 0);
@@ -1975,9 +2007,11 @@
             s.updateProgress(translate);
         
             // Normalize slideIndex
-            for (var i = 0; i < s.slidesGrid.length; i++) {
-                if (- Math.floor(translate * 100) >= Math.floor(s.slidesGrid[i] * 100)) {
-                    slideIndex = i;
+            if(s.params.normalizeSlideIndex){
+                for (var i = 0; i < s.slidesGrid.length; i++) {
+                    if (- Math.floor(translate * 100) >= Math.floor(s.slidesGrid[i] * 100)) {
+                        slideIndex = i;
+                    }
                 }
             }
         
@@ -2008,7 +2042,7 @@
             s.updateClasses();
             s.onTransitionStart(runCallbacks);
         
-            if (speed === 0) {
+            if (speed === 0 || s.browser.lteIE9) {
                 s.setWrapperTranslate(translate);
                 s.setWrapperTransition(0);
                 s.onTransitionEnd(runCallbacks);
@@ -2065,6 +2099,9 @@
                         s.emit('onSlidePrevEnd', s);
                     }
                 }
+            }
+            if (s.params.history && s.history) {
+                s.history.setHistory(s.params.history, s.activeIndex);
             }
             if (s.params.hashnav && s.hashnav) {
                 s.hashnav.setHash();
@@ -2720,15 +2757,15 @@
                 if (s.slides.length === 0) return;
         
                 var slide = s.slides.eq(index);
-                var img = slide.find('.' + s.params.lazyLoadingClass + ':not(.swiper-lazy-loaded):not(.swiper-lazy-loading)');
-                if (slide.hasClass(s.params.lazyLoadingClass) && !slide.hasClass('swiper-lazy-loaded') && !slide.hasClass('swiper-lazy-loading')) {
+                var img = slide.find('.' + s.params.lazyLoadingClass + ':not(.' + s.params.lazyStatusLoadedClass + '):not(.' + s.params.lazyStatusLoadingClass + ')');
+                if (slide.hasClass(s.params.lazyLoadingClass) && !slide.hasClass(s.params.lazyStatusLoadedClass) && !slide.hasClass(s.params.lazyStatusLoadingClass)) {
                     img = img.add(slide[0]);
                 }
                 if (img.length === 0) return;
         
                 img.each(function () {
                     var _img = $(this);
-                    _img.addClass('swiper-lazy-loading');
+                    _img.addClass(s.params.lazyStatusLoadingClass);
                     var background = _img.attr('data-background');
                     var src = _img.attr('data-src'),
                         srcset = _img.attr('data-srcset');
@@ -2749,8 +2786,8 @@
         
                         }
         
-                        _img.addClass('swiper-lazy-loaded').removeClass('swiper-lazy-loading');
-                        slide.find('.swiper-lazy-preloader, .preloader').remove();
+                        _img.addClass(s.params.lazyStatusLoadedClass).removeClass(s.params.lazyStatusLoadingClass);
+                        slide.find('.' + s.params.lazyPreloaderClass + ', .' + s.params.preloaderClass).remove();
                         if (s.params.loop && loadInDuplicate) {
                             var slideOriginalIndex = slide.attr('data-swiper-slide-index');
                             if (slide.hasClass(s.params.slideDuplicateClass)) {
@@ -2771,14 +2808,19 @@
             },
             load: function () {
                 var i;
+                var slidesPerView = s.params.slidesPerView;
+                if (slidesPerView === 'auto') {
+                    slidesPerView = 0;
+                }
+        
                 if (s.params.watchSlidesVisibility) {
                     s.wrapper.children('.' + s.params.slideVisibleClass).each(function () {
                         s.lazy.loadImageInSlide($(this).index());
                     });
                 }
                 else {
-                    if (s.params.slidesPerView > 1) {
-                        for (i = s.activeIndex; i < s.activeIndex + s.params.slidesPerView ; i++) {
+                    if (slidesPerView > 1) {
+                        for (i = s.activeIndex; i < s.activeIndex + slidesPerView ; i++) {
                             if (s.slides[i]) s.lazy.loadImageInSlide(i);
                         }
                     }
@@ -2787,13 +2829,13 @@
                     }
                 }
                 if (s.params.lazyLoadingInPrevNext) {
-                    if (s.params.slidesPerView > 1 || (s.params.lazyLoadingInPrevNextAmount && s.params.lazyLoadingInPrevNextAmount > 1)) {
+                    if (slidesPerView > 1 || (s.params.lazyLoadingInPrevNextAmount && s.params.lazyLoadingInPrevNextAmount > 1)) {
                         var amount = s.params.lazyLoadingInPrevNextAmount;
-                        var spv = s.params.slidesPerView;
+                        var spv = slidesPerView;
                         var maxIndex = Math.min(s.activeIndex + spv + Math.max(amount, spv), s.slides.length);
                         var minIndex = Math.max(s.activeIndex - Math.max(spv, amount), 0);
                         // Next Slides
-                        for (i = s.activeIndex + s.params.slidesPerView; i < maxIndex; i++) {
+                        for (i = s.activeIndex + slidesPerView; i < maxIndex; i++) {
                             if (s.slides[i]) s.lazy.loadImageInSlide(i);
                         }
                         // Prev Slides
@@ -3138,14 +3180,14 @@
           ===========================*/
         s.hashnav = {
             init: function () {
-                if (!s.params.hashnav) return;
+                if (!s.params.hashnav || s.params.history) return;
                 s.hashnav.initialized = true;
                 var hash = document.location.hash.replace('#', '');
                 if (!hash) return;
                 var speed = 0;
                 for (var i = 0, length = s.slides.length; i < length; i++) {
                     var slide = s.slides.eq(i);
-                    var slideHash = slide.attr('data-hash');
+                    var slideHash = slide.attr('data-hash') || slide.attr('data-history');
                     if (slideHash === hash && !slide.hasClass(s.params.slideDuplicateClass)) {
                         var index = slide.index();
                         s.slideTo(index, speed, s.params.runCallbacksOnInit, true);
@@ -3154,10 +3196,80 @@
             },
             setHash: function () {
                 if (!s.hashnav.initialized || !s.params.hashnav) return;
-                if (s.params.hashnavReplaceState && window.history && window.history.replaceState) {
+                if (s.params.replaceState && window.history && window.history.replaceState) {
                     window.history.replaceState(null, null, ('#' + s.slides.eq(s.activeIndex).attr('data-hash') || ''));
+                } else {
+                    var slide = s.slides.eq(s.activeIndex);
+                    var hash = slide.attr('data-hash') || slide.attr('data-history');
+                    document.location.hash = hash || '';
                 }
-                else document.location.hash = s.slides.eq(s.activeIndex).attr('data-hash') || '';
+            }
+        };
+
+        /*=========================
+          History Api with fallback to Hashnav
+          ===========================*/
+        s.history = {
+            init: function () {
+                if (!s.params.history) return;
+                if (!window.history || !window.history.pushState) {
+                    s.params.history = false;
+                    s.params.hashnav = true;
+                    return;
+                }
+                s.history.initialized = true;
+                this.paths = this.getPathValues();
+                if (!this.paths.key && !this.paths.value) return;
+                this.scrollToSlide(0, this.paths.value, s.params.runCallbacksOnInit);
+                if (!s.params.replaceState) {
+                    window.addEventListener('popstate', this.setHistoryPopState);
+                }
+            },
+            setHistoryPopState: function() {
+                s.history.paths = s.history.getPathValues();
+                s.history.scrollToSlide(s.params.speed, s.history.paths.value, false);
+            },
+            getPathValues: function() {
+                var pathArray = window.location.pathname.slice(1).split('/');
+                var total = pathArray.length;
+                var key = pathArray[total - 2];
+                var value = pathArray[total - 1];
+                return { key: key, value: value };
+            },
+            setHistory: function (key, index) {
+                if (!s.history.initialized || !s.params.history) return;
+                var slide = s.slides.eq(index);
+                var value = this.slugify(slide.attr('data-history'));
+                if (!window.location.pathname.includes(key)) {
+                    value = key + '/' + value;
+                }
+                if (s.params.replaceState) {
+                    window.history.replaceState(null, null, value);
+                } else {
+                    window.history.pushState(null, null, value);
+                }
+            },
+            slugify: function(text) {
+                return text.toString().toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^\w\-]+/g, '')
+                    .replace(/\-\-+/g, '-')
+                    .replace(/^-+/, '')
+                    .replace(/-+$/, '');
+            },
+            scrollToSlide: function(speed, value, runCallbacks) {
+                if (value) {
+                    for (var i = 0, length = s.slides.length; i < length; i++) {
+                        var slide = s.slides.eq(i);
+                        var slideHistory = this.slugify(slide.attr('data-history'));
+                        if (slideHistory === value && !slide.hasClass(s.params.slideDuplicateClass)) {
+                            var index = slide.index();
+                            s.slideTo(index, speed, runCallbacks);
+                        }
+                    }
+                } else {
+                    s.slideTo(0, speed, runCallbacks);
+                }
             }
         };
 
@@ -3183,7 +3295,7 @@
             if (kc === 37 || kc === 39 || kc === 38 || kc === 40) {
                 var inView = false;
                 //Check that swiper should be inside of visible area of window
-                if (s.container.parents('.swiper-slide').length > 0 && s.container.parents('.swiper-slide-active').length === 0) {
+                if (s.container.parents('.' + s.params.slideClass).length > 0 && s.container.parents('.' + s.params.slideActiveClass).length === 0) {
                     return;
                 }
                 var windowScroll = {
@@ -3247,64 +3359,61 @@
             lastScrollTime: (new window.Date()).getTime()
         };
         if (s.params.mousewheelControl) {
-            try {
-                new window.WheelEvent('wheel');
-                s.mousewheel.event = 'wheel';
-            } catch (e) {
-                if (window.WheelEvent || (s.container[0] && 'wheel' in s.container[0])) {
-                    s.mousewheel.event = 'wheel';
-                }
-            }
-            if (!s.mousewheel.event && window.WheelEvent) {
-        
-            }
-            if (!s.mousewheel.event && document.onmousewheel !== undefined) {
-                s.mousewheel.event = 'mousewheel';
-            }
-            if (!s.mousewheel.event) {
-                s.mousewheel.event = 'DOMMouseScroll';
-            }
+            /**
+             * The best combination if you prefer spinX + spinY normalization.  It favors
+             * the older DOMMouseScroll for Firefox, as FF does not include wheelDelta with
+             * 'wheel' event, making spin speed determination impossible.
+             */
+            s.mousewheel.event = (navigator.userAgent.indexOf('firefox') > -1) ?
+                'DOMMouseScroll' :
+                isEventSupported() ?
+                    'wheel' : 'mousewheel';
         }
+        
+        function isEventSupported() {
+            var eventName = 'onwheel';
+            var isSupported = eventName in document;
+        
+            if (!isSupported) {
+                var element = document.createElement('div');
+                element.setAttribute(eventName, 'return;');
+                isSupported = typeof element[eventName] === 'function';
+            }
+        
+            if (!isSupported &&
+                document.implementation &&
+                document.implementation.hasFeature &&
+                    // always returns true in newer browsers as per the standard.
+                    // @see http://dom.spec.whatwg.org/#dom-domimplementation-hasfeature
+                document.implementation.hasFeature('', '') !== true ) {
+                // This is the only way to test support for the `wheel` event in IE9+.
+                isSupported = document.implementation.hasFeature('Events.wheel', '3.0');
+            }
+        
+            return isSupported;
+        }
+        
         function handleMousewheel(e) {
             if (e.originalEvent) e = e.originalEvent; //jquery fix
-            var we = s.mousewheel.event;
             var delta = 0;
             var rtlFactor = s.rtl ? -1 : 1;
         
-            //WebKits
-            if (we === 'mousewheel') {
-                if (s.params.mousewheelForceToAxis) {
-                    if (s.isHorizontal()) {
-                        if (Math.abs(e.wheelDeltaX) > Math.abs(e.wheelDeltaY)) delta = e.wheelDeltaX * rtlFactor;
-                        else return;
-                    }
-                    else {
-                        if (Math.abs(e.wheelDeltaY) > Math.abs(e.wheelDeltaX)) delta = e.wheelDeltaY;
-                        else return;
-                    }
+            var data = normalizeWheel( e );
+        
+            if (s.params.mousewheelForceToAxis) {
+                if (s.isHorizontal()) {
+                    if (Math.abs(data.pixelX) > Math.abs(data.pixelY)) delta = data.pixelX * rtlFactor;
+                    else return;
                 }
                 else {
-                    delta = Math.abs(e.wheelDeltaX) > Math.abs(e.wheelDeltaY) ? - e.wheelDeltaX * rtlFactor : - e.wheelDeltaY;
+                    if (Math.abs(data.pixelY) > Math.abs(data.pixelX)) delta = data.pixelY;
+                    else return;
                 }
             }
-            //Old FireFox
-            else if (we === 'DOMMouseScroll') delta = -e.detail;
-            //New FireFox
-            else if (we === 'wheel') {
-                if (s.params.mousewheelForceToAxis) {
-                    if (s.isHorizontal()) {
-                        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) delta = -e.deltaX * rtlFactor;
-                        else return;
-                    }
-                    else {
-                        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) delta = -e.deltaY;
-                        else return;
-                    }
-                }
-                else {
-                    delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? - e.deltaX * rtlFactor : - e.deltaY;
-                }
+            else {
+                delta = Math.abs(data.pixelX) > Math.abs(data.pixelY) ? - data.pixelX * rtlFactor : - data.pixelY;
             }
+        
             if (delta === 0) return;
         
             if (s.params.mousewheelInvert) delta = -delta;
@@ -3374,6 +3483,170 @@
             return true;
         };
         
+        /**
+         * Mouse wheel (and 2-finger trackpad) support on the web sucks.  It is
+         * complicated, thus this doc is long and (hopefully) detailed enough to answer
+         * your questions.
+         *
+         * If you need to react to the mouse wheel in a predictable way, this code is
+         * like your bestest friend. * hugs *
+         *
+         * As of today, there are 4 DOM event types you can listen to:
+         *
+         *   'wheel'                -- Chrome(31+), FF(17+), IE(9+)
+         *   'mousewheel'           -- Chrome, IE(6+), Opera, Safari
+         *   'MozMousePixelScroll'  -- FF(3.5 only!) (2010-2013) -- don't bother!
+         *   'DOMMouseScroll'       -- FF(0.9.7+) since 2003
+         *
+         * So what to do?  The is the best:
+         *
+         *   normalizeWheel.getEventType();
+         *
+         * In your event callback, use this code to get sane interpretation of the
+         * deltas.  This code will return an object with properties:
+         *
+         *   spinX   -- normalized spin speed (use for zoom) - x plane
+         *   spinY   -- " - y plane
+         *   pixelX  -- normalized distance (to pixels) - x plane
+         *   pixelY  -- " - y plane
+         *
+         * Wheel values are provided by the browser assuming you are using the wheel to
+         * scroll a web page by a number of lines or pixels (or pages).  Values can vary
+         * significantly on different platforms and browsers, forgetting that you can
+         * scroll at different speeds.  Some devices (like trackpads) emit more events
+         * at smaller increments with fine granularity, and some emit massive jumps with
+         * linear speed or acceleration.
+         *
+         * This code does its best to normalize the deltas for you:
+         *
+         *   - spin is trying to normalize how far the wheel was spun (or trackpad
+         *     dragged).  This is super useful for zoom support where you want to
+         *     throw away the chunky scroll steps on the PC and make those equal to
+         *     the slow and smooth tiny steps on the Mac. Key data: This code tries to
+         *     resolve a single slow step on a wheel to 1.
+         *
+         *   - pixel is normalizing the desired scroll delta in pixel units.  You'll
+         *     get the crazy differences between browsers, but at least it'll be in
+         *     pixels!
+         *
+         *   - positive value indicates scrolling DOWN/RIGHT, negative UP/LEFT.  This
+         *     should translate to positive value zooming IN, negative zooming OUT.
+         *     This matches the newer 'wheel' event.
+         *
+         * Why are there spinX, spinY (or pixels)?
+         *
+         *   - spinX is a 2-finger side drag on the trackpad, and a shift + wheel turn
+         *     with a mouse.  It results in side-scrolling in the browser by default.
+         *
+         *   - spinY is what you expect -- it's the classic axis of a mouse wheel.
+         *
+         *   - I dropped spinZ/pixelZ.  It is supported by the DOM 3 'wheel' event and
+         *     probably is by browsers in conjunction with fancy 3D controllers .. but
+         *     you know.
+         *
+         * Implementation info:
+         *
+         * Examples of 'wheel' event if you scroll slowly (down) by one step with an
+         * average mouse:
+         *
+         *   OS X + Chrome  (mouse)     -    4   pixel delta  (wheelDelta -120)
+         *   OS X + Safari  (mouse)     -  N/A   pixel delta  (wheelDelta  -12)
+         *   OS X + Firefox (mouse)     -    0.1 line  delta  (wheelDelta  N/A)
+         *   Win8 + Chrome  (mouse)     -  100   pixel delta  (wheelDelta -120)
+         *   Win8 + Firefox (mouse)     -    3   line  delta  (wheelDelta -120)
+         *
+         * On the trackpad:
+         *
+         *   OS X + Chrome  (trackpad)  -    2   pixel delta  (wheelDelta   -6)
+         *   OS X + Firefox (trackpad)  -    1   pixel delta  (wheelDelta  N/A)
+         *
+         * On other/older browsers.. it's more complicated as there can be multiple and
+         * also missing delta values.
+         *
+         * The 'wheel' event is more standard:
+         *
+         * http://www.w3.org/TR/DOM-Level-3-Events/#events-wheelevents
+         *
+         * The basics is that it includes a unit, deltaMode (pixels, lines, pages), and
+         * deltaX, deltaY and deltaZ.  Some browsers provide other values to maintain
+         * backward compatibility with older events.  Those other values help us
+         * better normalize spin speed.  Example of what the browsers provide:
+         *
+         *                          | event.wheelDelta | event.detail
+         *        ------------------+------------------+--------------
+         *          Safari v5/OS X  |       -120       |       0
+         *          Safari v5/Win7  |       -120       |       0
+         *         Chrome v17/OS X  |       -120       |       0
+         *         Chrome v17/Win7  |       -120       |       0
+         *                IE9/Win7  |       -120       |   undefined
+         *         Firefox v4/OS X  |     undefined    |       1
+         *         Firefox v4/Win7  |     undefined    |       3
+         *
+         */
+        function normalizeWheel( /*object*/ event ) /*object*/ {
+            // Reasonable defaults
+            var PIXEL_STEP = 10;
+            var LINE_HEIGHT = 40;
+            var PAGE_HEIGHT = 800;
+        
+            var sX = 0, sY = 0,       // spinX, spinY
+                pX = 0, pY = 0;       // pixelX, pixelY
+        
+            // Legacy
+            if( 'detail' in event ) {
+                sY = event.detail;
+            }
+            if( 'wheelDelta' in event ) {
+                sY = -event.wheelDelta / 120;
+            }
+            if( 'wheelDeltaY' in event ) {
+                sY = -event.wheelDeltaY / 120;
+            }
+            if( 'wheelDeltaX' in event ) {
+                sX = -event.wheelDeltaX / 120;
+            }
+        
+            // side scrolling on FF with DOMMouseScroll
+            if( 'axis' in event && event.axis === event.HORIZONTAL_AXIS ) {
+                sX = sY;
+                sY = 0;
+            }
+        
+            pX = sX * PIXEL_STEP;
+            pY = sY * PIXEL_STEP;
+        
+            if( 'deltaY' in event ) {
+                pY = event.deltaY;
+            }
+            if( 'deltaX' in event ) {
+                pX = event.deltaX;
+            }
+        
+            if( (pX || pY) && event.deltaMode ) {
+                if( event.deltaMode === 1 ) {          // delta in LINE units
+                    pX *= LINE_HEIGHT;
+                    pY *= LINE_HEIGHT;
+                } else {                             // delta in PAGE units
+                    pX *= PAGE_HEIGHT;
+                    pY *= PAGE_HEIGHT;
+                }
+            }
+        
+            // Fall-back if spin cannot be determined
+            if( pX && !sX ) {
+                sX = (pX < 1) ? -1 : 1;
+            }
+            if( pY && !sY ) {
+                sY = (pY < 1) ? -1 : 1;
+            }
+        
+            return {
+                spinX: sX,
+                spinY: sY,
+                pixelX: pX,
+                pixelY: pY
+            };
+        }
 
         /*=========================
           Parallax
@@ -3572,7 +3845,7 @@
                 }
             },
         
-            liveRegion: $('<span class="swiper-notification" aria-live="assertive" aria-atomic="true"></span>'),
+            liveRegion: $('<span class="' + s.params.notificationClass + '" aria-live="assertive" aria-atomic="true"></span>'),
         
             notify: function (message) {
                 var notification = s.a11y.liveRegion;
@@ -3658,6 +3931,13 @@
             if (s.params.mousewheelControl) {
                 if (s.enableMousewheelControl) s.enableMousewheelControl();
             }
+            // Deprecated hashnavReplaceState changed to replaceState for use in hashnav and history
+            if (s.params.hashnavReplaceState) {
+                s.params.replaceState = s.params.hashnavReplaceState;
+            }
+            if (s.params.history) {
+                if (s.history) s.history.init();
+            }
             if (s.params.hashnav) {
                 if (s.hashnav) s.hashnav.init();
             }
@@ -3737,6 +4017,10 @@
             }
             // Disable a11y
             if (s.params.a11y && s.a11y) s.a11y.destroy();
+            // Delete history popstate
+            if (s.params.history && !s.params.replaceState) {
+                window.removeEventListener('popstate', s.history.setHistoryPopState);
+            }
             // Destroy callback
             s.emit('onDestroy');
             // Delete instance
@@ -3769,7 +4053,15 @@
             ====================================================*/
             browser: {
                 ie: window.navigator.pointerEnabled || window.navigator.msPointerEnabled,
-                ieTouch: (window.navigator.msPointerEnabled && window.navigator.msMaxTouchPoints > 1) || (window.navigator.pointerEnabled && window.navigator.maxTouchPoints > 1)
+                ieTouch: (window.navigator.msPointerEnabled && window.navigator.msMaxTouchPoints > 1) || (window.navigator.pointerEnabled && window.navigator.maxTouchPoints > 1),
+                lteIE9: (function() {
+                    // create temporary DIV
+                    var div = document.createElement('div');
+                    // add content to tmp DIV which is wrapped into the IE HTML conditional statement
+                    div.innerHTML = '<!--[if lte IE 9]><i></i><![endif]-->';
+                    // return true / false value based on what will browser render
+                    return div.getElementsByTagName('i').length === 1;
+                })()
             },
             /*==================================================
             Devices
@@ -4555,6 +4847,17 @@
                         elStyle.webkitTransitionDuration = elStyle.MsTransitionDuration = elStyle.msTransitionDuration = elStyle.MozTransitionDuration = elStyle.OTransitionDuration = elStyle.transitionDuration = duration;
                     }
                     return this;
+                };
+            }
+            if (!('outerWidth' in domLib.fn)) {
+                domLib.fn.outerWidth = function (includeMargins) {
+                    if (this.length > 0) {
+                        if (includeMargins)
+                            return this[0].offsetWidth + parseFloat(this.css('margin-right')) + parseFloat(this.css('margin-left'));
+                        else
+                            return this[0].offsetWidth;
+                    }
+                    else return null;
                 };
             }
         }
