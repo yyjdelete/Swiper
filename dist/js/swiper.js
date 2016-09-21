@@ -10,7 +10,7 @@
  * 
  * Licensed under MIT
  * 
- * Released on: September 18, 2016
+ * Released on: September 21, 2016
  */
         (function () {
             'use strict';
@@ -1444,7 +1444,7 @@
         
         // Touch handlers
         var isTouchEvent, startMoving;
-        var touchDebug = false;
+        /** @const */ var touchDebug = false;
         var logTouch = function (e, touchType) {
             var touches = e[touchType];
             if (!touches) return null;
@@ -1732,6 +1732,7 @@
                     if (!targetTouch) return;
                 }
             }
+            var isCancel = /cancel$/i.test(e.type);
             if (allowTouchCallbacks) {
                 s.emit('onTouchEnd', s, e);
             }
@@ -1742,35 +1743,43 @@
                 s.setGrabCursor(false);
             }
         
-            // Time diff
-            var touchEndTime = Date.now();
-            var timeDiff = touchEndTime - touchStartTime;
+            if (!isCancel) {
+                // Time diff
+                var touchEndTime = Date.now();
+                var timeDiff = touchEndTime - touchStartTime;
         
-            // Tap, doubleTap, Click
-            if (s.allowClick) {
-                s.updateClickedSlide(e);
-                s.emit('onTap', s, e);
-                if (timeDiff < 300 && (touchEndTime - lastClickTime) > 300) {
-                    if (clickTimeout) clearTimeout(clickTimeout);
-                    clickTimeout = setTimeout(function () {
-                        if (!s) return;
-                        if (s.params.paginationHide && s.paginationContainer.length > 0 && !$(e.target).hasClass(s.params.bulletClass)) {
-                            s.paginationContainer.toggleClass(s.params.paginationHiddenClass);
-                        }
-                        s.emit('onClick', s, e);
-                    }, 300);
+                // Tap, doubleTap, Click
+                if (s.allowClick) {
+                    s.updateClickedSlide(e);
+                    s.emit('onTap', s, e);
+                    if (timeDiff < 300 && (touchEndTime - lastClickTime) > 300) {
+                        if (clickTimeout) clearTimeout(clickTimeout);
+                        clickTimeout = setTimeout(function () {
+                            if (!s) return;
+                            if (s.params.paginationHide && s.paginationContainer.length > 0 && !$(e.target).hasClass(s.params.bulletClass)) {
+                                s.paginationContainer.toggleClass(s.params.paginationHiddenClass);
+                            }
+                            s.emit('onClick', s, e);
+                        }, 300);
         
+                    }
+                    if (timeDiff < 300 && (touchEndTime - lastClickTime) < 300) {
+                        if (clickTimeout) clearTimeout(clickTimeout);
+                        s.emit('onDoubleTap', s, e);
+                    }
                 }
-                if (timeDiff < 300 && (touchEndTime - lastClickTime) < 300) {
-                    if (clickTimeout) clearTimeout(clickTimeout);
-                    s.emit('onDoubleTap', s, e);
-                }
+        
+                lastClickTime = Date.now();
             }
-        
-            lastClickTime = Date.now();
             setTimeout(function () {
                 if (s) s.allowClick = true;
             }, 0);
+        
+            if (isCancel) {
+                isTouched = isMoved = false;
+                s.slideReset();
+                return;
+            }
         
             if (!isTouched || !isMoved || !s.swipeDirection || s.touches.diff === 0 || currentTranslate === startTranslate) {
                 isTouched = isMoved = false;
